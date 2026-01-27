@@ -3,10 +3,11 @@ header("Content-Type: application/json");
 include "db.php";
 
 // user location (optional)
-$user_lat = isset($_GET['lat']) ? $_GET['lat'] : null;
-$user_lng = isset($_GET['lng']) ? $_GET['lng'] : null;
+$user_lat = isset($_GET['lat']) ? floatval($_GET['lat']) : null;
+$user_lng = isset($_GET['lng']) ? floatval($_GET['lng']) : null;
 
-$sql = "SELECT * FROM recycling_centers WHERE is_authorized = 1";
+// fetch all authorized centers
+$sql = "SELECT * FROM recycling_centers WHERE is_authorized = 1 ORDER BY id ASC";
 $result = $conn->query($sql);
 
 $centers = [];
@@ -16,15 +17,19 @@ while ($row = $result->fetch_assoc()) {
     // default distance
     $distance = null;
 
-    // calculate distance if user location provided
-    if ($user_lat && $user_lng) {
+    // calculate distance ONLY if both lat & lng are provided
+    if ($user_lat !== null && $user_lng !== null) {
+
         $theta = $user_lng - $row['longitude'];
         $dist = sin(deg2rad($user_lat)) * sin(deg2rad($row['latitude'])) +
                 cos(deg2rad($user_lat)) * cos(deg2rad($row['latitude'])) *
                 cos(deg2rad($theta));
-        $dist = acos($dist);
+
+        $dist = acos(min(max($dist, -1), 1)); // safety clamp
         $dist = rad2deg($dist);
-        $distance = round($dist * 60 * 1.1515 * 1.609344, 2); // KM
+
+        // convert to KM
+        $distance = round($dist * 60 * 1.1515 * 1.609344, 2);
     }
 
     $centers[] = [

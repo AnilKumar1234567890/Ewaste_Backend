@@ -4,10 +4,7 @@ include "db.php";
 
 $data = json_decode(file_get_contents("php://input"), true);
 
-if (
-    empty($data['email']) ||
-    empty($data['password'])
-) {
+if (empty($data['email']) || empty($data['password'])) {
     echo json_encode([
         "status" => "error",
         "message" => "Email and password required"
@@ -18,10 +15,13 @@ if (
 $email = $data['email'];
 $password = $data['password'];
 
-$query = "SELECT * FROM user_login WHERE email='$email'";
-$result = mysqli_query($conn, $query);
+// ** THE FIX IS HERE: Using prepared statements **
+$stmt = $conn->prepare("SELECT * FROM user_login WHERE email = ?");
+$stmt->bind_param("s", $email); // 's' for string
+$stmt->execute();
+$result = $stmt->get_result();
 
-if (mysqli_num_rows($result) == 0) {
+if ($result->num_rows === 0) {
     echo json_encode([
         "status" => "error",
         "message" => "Email not registered"
@@ -29,7 +29,7 @@ if (mysqli_num_rows($result) == 0) {
     exit;
 }
 
-$user = mysqli_fetch_assoc($result);
+$user = $result->fetch_assoc();
 
 if (password_verify($password, $user['password'])) {
     echo json_encode([
@@ -44,3 +44,7 @@ if (password_verify($password, $user['password'])) {
         "message" => "Invalid password"
     ]);
 }
+
+$stmt->close();
+$conn->close();
+?>
